@@ -48,7 +48,8 @@ st.markdown(
 )
 
 st.title("🔗 Nexo PDF")
-st.caption("Junte vários PDFs em um só, ou divida um PDF em partes — tudo direto no navegador.")
+st.subheader("Junte vários PDFs em um só, ou divida um PDF em partes — tudo direto no navegador.")
+st.caption("Não salva seus arquivos em disco. Seus arquivos são perdidos quando a página é atualizada.")
 
 tab_merge, tab_split = st.tabs(["🔗 Combinar PDFs", "✂️ Dividir PDF"])
 
