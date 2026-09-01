@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8" />
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: transparent;
+    color: var(--text, inherit);
+  }
+  #root { padding: 2px; }
+
+  .section-title {
+    font-size: 0.82rem; font-weight: 600; opacity: 0.75;
+    margin: 2px 0 8px 0; text-transform: uppercase; letter-spacing: 0.02em;
+  }
+  .clear-btn {
+    float: right; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+    color: var(--accent, #6366f1); text-transform: none; letter-spacing: normal;
+    background: none; border: none; padding: 0;
+  }
+  .clear-btn:hover { text-decoration: underline; }
+
+  /* --- grade de miniaturas --- */
+  #grid {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    padding: 4px; border-radius: 14px;
+    transition: background 0.15s ease;
+  }
+  #grid.drag-over { background: var(--accent-soft, rgba(99,102,241,0.10)); }
+
+  .thumb-card {
+    position: relative;
+    width: 96px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 6px;
+    border-radius: 10px;
+    border: 1px solid var(--border, rgba(120,120,120,0.25));
+    background: var(--bg, rgba(120,120,120,0.05));
+    cursor: grab;
+    user-select: none;
+    transition: opacity 0.12s ease, box-shadow 0.12s ease;
+  }
+  .thumb-card:active { cursor: grabbing; }
+  .thumb-card.dragging { opacity: 0.35; }
+  .thumb-card img {
+    width: 100%; height: 118px; object-fit: contain;
+    border-radius: 6px; background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+    pointer-events: none;
+  }
+  .thumb-card .page-label {
+    font-size: 0.72rem; opacity: 0.7; pointer-events: none;
+  }
+  .thumb-card .count-badge {
+    position: absolute; top: -6px; right: -6px;
+    min-width: 20px; height: 20px; padding: 0 5px;
+    border-radius: 999px;
+    background: var(--accent, #6366f1); color: #fff;
+    font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+
+  /* --- caixa de seleção (bin) --- */
+  #bin-wrap { margin-top: 18px; }
+  #bin {
+    min-height: 108px;
+    display: flex; flex-wrap: wrap; align-content: flex-start; gap: 8px;
+    padding: 10px; border-radius: 14px;
+    border: 2px dashed var(--border, rgba(120,120,120,0.35));
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  #bin.drag-over { border-color: var(--accent, #6366f1); background: var(--accent-soft, rgba(99,102,241,0.10)); }
+
+  .bin-empty {
+    width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; padding: 14px 8px; opacity: 0.55; font-size: 0.85rem; text-align: center;
+    pointer-events: none;
+  }
+  .bin-empty .big { font-size: 1.4rem; }
+
+  .bin-chip {
+    position: relative;
+    width: 64px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 5px;
+    border-radius: 9px;
+    border: 1px solid var(--border, rgba(120,120,120,0.25));
+    background: var(--bg, rgba(120,120,120,0.06));
+    cursor: grab;
+    user-select: none;
+    transition: opacity 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  }
+  .bin-chip:active { cursor: grabbing; }
+  .bin-chip.dragging { opacity: 0.35; }
+  .bin-chip.drag-over { border-color: var(--accent, #6366f1); box-shadow: 0 0 0 2px var(--accent-soft, rgba(99,102,241,0.35)); }
+  .bin-chip img {
+    width: 100%; height: 76px; object-fit: contain;
+    border-radius: 5px; background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.18);
+    pointer-events: none;
+  }
+  .bin-chip .order-badge {
+    position: absolute; top: -6px; left: -6px;
+    min-width: 18px; height: 18px; padding: 0 4px;
+    border-radius: 999px;
+    background: var(--accent, #6366f1); color: #fff;
+    font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    pointer-events: none;
+  }
+  .bin-chip .remove-btn {
+    position: absolute; top: -6px; right: -6px;
+    width: 18px; height: 18px; border-radius: 999px;
+    background: rgba(60,60,60,0.75); color: #fff;
+    border: none; font-size: 11px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+  }
+  .bin-chip .remove-btn:hover { background: #e5484d; }
+</style>
+</head>
+<body>
+<div id="root">
+  <div class="section-title">Todas as páginas</div>
+  <div id="grid"></div>
+
+  <div id="bin-wrap">
+    <div class="section-title">
+      Selecionadas para baixar
+      <button type="button" class="clear-btn" id="clear-btn">Limpar seleção</button>
+    </div>
+    <div id="bin"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var currentPages = [];
+  var pagesByIndex = {};
+  var binEntries = [];       // [{uid, pageIndex}]
+  var lastSignature = null;
+  var uidCounter = 0;
+  var dragPayload = null;    // {source: 'grid'|'bin', pageIndex?, uid?}
+
+  var gridEl = document.getElementById("grid");
+  var binEl = document.getElementById("bin");
+  var clearBtn = document.getElementById("clear-btn");
+
+  function post(msg) {
+    window.parent.postMessage(Object.assign({ isStreamlitMessage: true }, msg), "*");
+  }
+  function setFrameHeight() {
+    post({ type: "streamlit:setFrameHeight", height: document.documentElement.scrollHeight });
+  }
+  function sendValue(indices) {
+    post({ type: "streamlit:setComponentValue", value: indices, dataType: "json" });
+  }
+  function escapeHtml(str) {
+    var div = document.createElement("div");
+    div.textContent = str == null ? "" : String(str);
+    return div.innerHTML;
+  }
+  function nextUid() { uidCounter += 1; return "b" + uidCounter; }
+
+  function applyTheme(theme) {
+    if (!theme) return;
+    var root = document.documentElement;
+    root.style.setProperty("--text", theme.textColor || "inherit");
+    root.style.setProperty("--accent", theme.primaryColor || "#6366f1");
+    var isDark = (theme.base === "dark");
+    root.style.setProperty("--border", isDark ? "rgba(250,250,250,0.18)" : "rgba(49,51,63,0.18)");
+    root.style.setProperty("--bg", isDark ? "rgba(250,250,250,0.06)" : "rgba(49,51,63,0.045)");
+    root.style.setProperty("--accent-soft", hexToRgba(theme.primaryColor, 0.16) || "rgba(99,102,241,0.16)");
+  }
+  function hexToRgba(hex, alpha) {
+    if (!hex) return null;
+    var m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (!m) return null;
+    var r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
+    return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
+  }
+
+  function countInBin(pageIndex) {
+    var n = 0;
+    for (var i = 0; i < binEntries.length; i++) if (binEntries[i].pageIndex === pageIndex) n++;
+    return n;
+  }
+
+  function renderGrid() {
+    gridEl.innerHTML = "";
+    currentPages.forEach(function (page) {
+      var card = document.createElement("div");
+      card.className = "thumb-card";
+      card.draggable = true;
+
+      var count = countInBin(page.index);
+      card.innerHTML =
+        (count > 0 ? '<span class="count-badge">' + count + '</span>' : '') +
+        '<img src="' + page.thumb + '" alt="' + escapeHtml(page.label) + '" />' +
+        '<span class="page-label">' + escapeHtml(page.label) + '</span>';
+
+      card.addEventListener("dragstart", function (e) {
+        dragPayload = { source: "grid", pageIndex: page.index };
+        card.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "copy";
+        try { e.dataTransfer.setData("text/plain", "page:" + page.index); } catch (err) {}
+      });
+      card.addEventListener("dragend", function () {
+        card.classList.remove("dragging");
+        dragPayload = null;
+        clearHighlights();
+      });
+
+      gridEl.appendChild(card);
+    });
+  }
+
+  function renderBin() {
+    binEl.innerHTML = "";
+    clearBtn.style.display = binEntries.length > 0 ? "inline" : "none";
+
+    if (binEntries.length === 0) {
+      var empty = document.createElement("div");
+      empty.className = "bin-empty";
+      empty.innerHTML = '<span class="big">🗂️</span><span>Arraste aqui as páginas que deseja baixar</span>';
+      binEl.appendChild(empty);
+      return;
+    }
+
+    binEntries.forEach(function (entry, pos) {
+      var page = pagesByIndex[entry.pageIndex];
+      if (!page) return;
+      var chip = document.createElement("div");
+      chip.className = "bin-chip";
+      chip.draggable = true;
+      chip.dataset.pos = String(pos);
+
+      chip.innerHTML =
+        '<span class="order-badge">' + (pos + 1) + '</span>' +
+        '<button type="button" class="remove-btn" title="Remover">✕</button>' +
+        '<img src="' + page.thumb + '" alt="' + escapeHtml(page.label) + '" />';
+
+      chip.addEventListener("dragstart", function (e) {
+        dragPayload = { source: "bin", uid: entry.uid };
+        chip.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+        try { e.dataTransfer.setData("text/plain", "bin:" + entry.uid); } catch (err) {}
+      });
+      chip.addEventListener("dragend", function () {
+        chip.classList.remove("dragging");
+        dragPayload = null;
+        clearHighlights();
+      });
+      chip.addEventListener("dragover", function (e) {
+        if (!dragPayload) return;
+        e.preventDefault();
+        e.stopPropagation();
+        chip.classList.add("drag-over");
+      });
+      chip.addEventListener("dragleave", function () {
+        chip.classList.remove("drag-over");
+      });
+      chip.addEventListener("drop", function (e) {
+        if (!dragPayload) return;
+        e.preventDefault();
+        e.stopPropagation();
+        chip.classList.remove("drag-over");
+        var atIndex = parseInt(chip.dataset.pos, 10);
+        if (dragPayload.source === "grid") {
+          insertFromGrid(dragPayload.pageIndex, atIndex);
+        } else if (dragPayload.source === "bin" && dragPayload.uid !== entry.uid) {
+          moveWithinBin(dragPayload.uid, atIndex);
+        }
+        dragPayload = null;
+      });
+
+      var removeBtn = chip.querySelector(".remove-btn");
+      removeBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        removeFromBin(entry.uid);
+      });
+      removeBtn.addEventListener("dragstart", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+
+      binEl.appendChild(chip);
+    });
+  }
+
+  function clearHighlights() {
+    gridEl.classList.remove("drag-over");
+    binEl.classList.remove("drag-over");
+    Array.prototype.forEach.call(binEl.querySelectorAll(".bin-chip"), function (c) {
+      c.classList.remove("drag-over");
+    });
+  }
+
+  function commitBin() {
+    renderGrid();
+    renderBin();
+    sendValue(binEntries.map(function (e) { return e.pageIndex; }));
+    setFrameHeight();
+  }
+
+  function insertFromGrid(pageIndex, atIndex) {
+    binEntries.splice(atIndex, 0, { uid: nextUid(), pageIndex: pageIndex });
+    commitBin();
+  }
+  function appendFromGrid(pageIndex) {
+    insertFromGrid(pageIndex, binEntries.length);
+  }
+  function moveWithinBin(uid, atIndex) {
+    var fromIdx = binEntries.findIndex(function (e) { return e.uid === uid; });
+    if (fromIdx === -1) return;
+    var entry = binEntries.splice(fromIdx, 1)[0];
+    var insertAt = atIndex;
+    if (fromIdx < atIndex) insertAt -= 1;
+    binEntries.splice(insertAt, 0, entry);
+    commitBin();
+  }
+  function moveToEndWithinBin(uid) {
+    moveWithinBin(uid, binEntries.length);
+  }
+  function removeFromBin(uid) {
+    binEntries = binEntries.filter(function (e) { return e.uid !== uid; });
+    commitBin();
+  }
+
+  // Área da grade: soltar um chip da bin aqui remove a seleção.
+  gridEl.addEventListener("dragover", function (e) {
+    if (!dragPayload || dragPayload.source !== "bin") return;
+    e.preventDefault();
+    gridEl.classList.add("drag-over");
+  });
+  gridEl.addEventListener("dragleave", function (e) {
+    if (e.target === gridEl) gridEl.classList.remove("drag-over");
+  });
+  gridEl.addEventListener("drop", function (e) {
+    if (!dragPayload || dragPayload.source !== "bin") return;
+    e.preventDefault();
+    gridEl.classList.remove("drag-over");
+    removeFromBin(dragPayload.uid);
+    dragPayload = null;
+  });
+
+  // Caixa de seleção: soltar em área vazia (fora de um chip específico) anexa ao fim.
+  binEl.addEventListener("dragover", function (e) {
+    if (!dragPayload) return;
+    e.preventDefault();
+    binEl.classList.add("drag-over");
+  });
+  binEl.addEventListener("dragleave", function (e) {
+    if (e.target === binEl) binEl.classList.remove("drag-over");
+  });
+  binEl.addEventListener("drop", function (e) {
+    if (!dragPayload) return;
+    e.preventDefault();
+    binEl.classList.remove("drag-over");
+    if (dragPayload.source === "grid") appendFromGrid(dragPayload.pageIndex);
+    else if (dragPayload.source === "bin") moveToEndWithinBin(dragPayload.uid);
+    dragPayload = null;
+  });
+
+  clearBtn.addEventListener("click", function () {
+    binEntries = [];
+    commitBin();
+  });
+
+  function computeSignature(pages) {
+    return pages.map(function (p) { return p.index; }).join(",");
+  }
+
+  function render(pages) {
+    var sig = computeSignature(pages);
+    if (sig !== lastSignature) {
+      binEntries = [];
+      lastSignature = sig;
+    }
+    currentPages = pages;
+    pagesByIndex = {};
+    pages.forEach(function (p) { pagesByIndex[p.index] = p; });
+    renderGrid();
+    renderBin();
+    setFrameHeight();
+  }
+
+  window.addEventListener("message", function (event) {
+    var data = event.data;
+    if (!data || data.type !== "streamlit:render") return;
+    applyTheme(data.theme);
+    render((data.args && data.args.pages) || []);
+  });
+
+  post({ type: "streamlit:componentReady", apiVersion: 1 });
+  setFrameHeight();
+})();
+</script>
+</body>
+</html>
