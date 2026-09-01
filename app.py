@@ -1,7 +1,6 @@
 """
 Nexo PDF
-Aplicativo web simples para combinar PDFs e imagens em um único arquivo PDF,
-ou dividir um PDF em partes menores.
+Aplicativo Web para combinar PDFs e imagens em um único PDF ou dividir PDFs de forma simples e prática.
 """
 
 import base64
