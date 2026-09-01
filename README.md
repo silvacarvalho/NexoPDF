@@ -1,7 +1,7 @@
 # Nexo PDF
 
 Aplicativo web (Streamlit) para trabalhar com PDFs — hoje:
-- **Combinar** vários PDFs em um único arquivo, reordenando por arrastar-e-soltar.
+- **Combinar** vários PDFs e/ou imagens (JPG, PNG, WEBP...) em um único arquivo PDF, reordenando por arrastar-e-soltar. Cada imagem vira uma página no mesmo formato/proporção da imagem original.
 - **Dividir** um PDF arrastando miniaturas das páginas para uma caixa de seleção (mais intervalo de páginas, divisão em lote e intervalos personalizados nas opções avançadas).
 
 O resultado sempre pode ser baixado diretamente pelo navegador (PDF único ou `.zip` com várias partes).

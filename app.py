@@ -1,6 +1,6 @@
 """
-Combinar/Dividir PDF
-Aplicativo web simples para combinar múltiplos PDFs em um único arquivo,
+Nexo PDF
+Aplicativo web simples para combinar PDFs e imagens em um único arquivo PDF,
 ou dividir um PDF em partes menores.
 """
 
@@ -48,7 +48,7 @@ st.markdown(
 )
 
 st.title("🔗 Nexo PDF")
-st.subheader("Junte vários PDFs em um só, ou divida um PDF em partes — tudo direto no navegador.")
+st.subheader("Junte PDFs e imagens em um só arquivo, ou divida um PDF em partes — tudo direto no navegador.")
 st.caption("Não salva seus arquivos em disco. Seus arquivos são perdidos quando a página é atualizada.")
 
 tab_merge, tab_split = st.tabs(["🔗 Combinar PDFs", "✂️ Dividir PDF"])
@@ -57,12 +57,39 @@ tab_merge, tab_split = st.tabs(["🔗 Combinar PDFs", "✂️ Dividir PDF"])
 # --------------------------------------------------------------------------
 # Aba: Combinar
 # --------------------------------------------------------------------------
+IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff"}
+
+
+def file_extension(filename: str) -> str:
+    return filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+
+def is_image_file(filename: str) -> bool:
+    return file_extension(filename) in IMAGE_EXTENSIONS
+
+
+def image_bytes_to_pdf_bytes(image_bytes: bytes, dpi: int = 150) -> bytes:
+    """Converte uma imagem em um PDF de 1 página, do mesmo formato/proporção da imagem."""
+    pix = pymupdf.Pixmap(image_bytes)
+    width_pt = pix.width * 72 / dpi
+    height_pt = pix.height * 72 / dpi
+    pix = None
+
+    doc = pymupdf.open()
+    try:
+        page = doc.new_page(width=width_pt, height=height_pt)
+        page.insert_image(page.rect, stream=image_bytes)
+        return doc.tobytes()
+    finally:
+        doc.close()
+
+
 with tab_merge:
-    st.subheader("Combinar vários PDFs em um único arquivo")
+    st.subheader("Combinar PDFs e imagens em um único arquivo PDF")
 
     uploaded = st.file_uploader(
-        "Selecione ou arraste os arquivos PDF",
-        type=["pdf"],
+        "Selecione ou arraste arquivos PDF e/ou imagens (JPG, PNG, WEBP...)",
+        type=["pdf", "png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff"],
         accept_multiple_files=True,
         key="merge_uploader",
     )
@@ -79,16 +106,27 @@ with tab_merge:
         ):
             st.session_state.merge_order = current_names
 
-        # Monta os itens exibidos (nome + nº de páginas) na ordem atual.
+        # Monta os itens exibidos (nome + nº de páginas/dimensões) na ordem atual.
         items = []
         for name in st.session_state.merge_order:
-            try:
-                files_by_name[name].seek(0)
-                n_pages = len(PdfReader(files_by_name[name]).pages)
-                subtitle = f"{n_pages} pág."
-            except Exception:
-                subtitle = "⚠️ não foi possível ler"
-            items.append({"id": name, "title": name, "subtitle": subtitle, "icon": "📄"})
+            f = files_by_name[name]
+            if is_image_file(name):
+                try:
+                    f.seek(0)
+                    pix = pymupdf.Pixmap(f.read())
+                    subtitle = f"{pix.width}×{pix.height}px"
+                except Exception:
+                    subtitle = "⚠️ não foi possível ler"
+                icon = "🖼️"
+            else:
+                try:
+                    f.seek(0)
+                    n_pages = len(PdfReader(f).pages)
+                    subtitle = f"{n_pages} pág."
+                except Exception:
+                    subtitle = "⚠️ não foi possível ler"
+                icon = "📄"
+            items.append({"id": name, "title": name, "subtitle": subtitle, "icon": icon})
 
         st.write("**Ordem dos arquivos** (arraste para reordenar):")
         st.session_state.merge_order = reorder_list(items, key="merge_reorder")
@@ -100,29 +138,32 @@ with tab_merge:
         if not output_name.lower().endswith(".pdf"):
             output_name += ".pdf"
 
-        if st.button("🔗 Combinar PDFs", type="primary", use_container_width=True):
+        if st.button("🔗 Combinar em um PDF", type="primary", use_container_width=True):
             writer = PdfWriter()
             errors = []
             for name in order:
                 f = files_by_name[name]
                 try:
                     f.seek(0)
-                    reader = PdfReader(f)
+                    data = f.read()
+                    if is_image_file(name):
+                        data = image_bytes_to_pdf_bytes(data)
+                    reader = PdfReader(io.BytesIO(data))
                     for page in reader.pages:
                         writer.add_page(page)
-                except PdfReadError:
+                except Exception:
                     errors.append(name)
 
             if errors:
                 st.error(
                     "Não foi possível ler o(s) arquivo(s): " + ", ".join(errors)
-                    + ". Verifique se não estão corrompidos ou protegidos por senha."
+                    + ". Verifique se não estão corrompidos, em formato não suportado, ou protegidos por senha."
                 )
             else:
                 buffer = io.BytesIO()
                 writer.write(buffer)
                 buffer.seek(0)
-                st.success(f"PDFs combinados com sucesso! Total de {len(writer.pages)} páginas.")
+                st.success(f"Combinado com sucesso! Total de {len(writer.pages)} páginas.")
                 st.download_button(
                     "⬇️ Baixar PDF combinado",
                     data=buffer,
@@ -131,7 +172,7 @@ with tab_merge:
                     use_container_width=True,
                 )
     else:
-        st.info("Envie dois ou mais arquivos PDF para começar.")
+        st.info("Envie dois ou mais arquivos (PDF e/ou imagens) para começar.")
 
 
 # --------------------------------------------------------------------------
